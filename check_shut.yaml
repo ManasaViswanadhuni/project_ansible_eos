@@ -1,0 +1,48 @@
+#author: @ManasaViswandhuni
+#This script file finds the interface that are down in arista eos device and do the interfaces up
+
+---
+- hosts: eos_demo_group
+  gather_facts: no
+  connection: local
+
+  tasks:
+    - name: Logging into the remote device and Checking the interface status
+      eos_command:
+        host: "{{ inventory_hostname }}"
+        provider: "{{ provider }}"
+        commands: show ip interface brief
+      register: show
+    - name: Login is successful and checking if any interface is down
+      debug:
+        msg : "interface {{ item.split(' ')[0] }} is down"
+      with_items: "{{ show.stdout_lines}}"
+      when : item | search('down')
+    - name: Enabling interfaces if any interfaces are down
+      eos_config:
+        host: "{{ inventory_hostname }}"
+        provider: "{{ provider }}"
+        lines: 
+          - "interface {{ item.split(' ')[0] }} "
+          - "no shut"
+          - "do wr"
+      with_items: "{{ show.stdout_lines}}"
+      when : item | search('down')
+    - pause: 
+        seconds: 5
+    - name: Checking interfaces status after executing program
+      eos_command:
+        host: "{{ inventory_hostname }}"
+        provider: "{{ provider }}"
+        commands: show ip interface brief
+      register: conf
+    - name: Interface status after execution
+      debug:
+        msg: "{{ conf.stdout_lines }}"
+    - name: saving output in ./backups folder 
+      copy:
+        content: "{{conf.stdout[0]}}"
+        dest: "./backups/show_int_status_{{ inventory_hostname }}.txt" 
+          
+  
+
